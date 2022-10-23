@@ -1,64 +1,53 @@
+from msilib.schema import ODBCDataSource
 from bs4 import BeautifulSoup
 
 import pandas as pd
+import requests
 
 def main():
-    sport = "ncaaf/odds"
-    url = getUrl(sport)
+    headers = {"Accept-Language": "en-US, en;q=0.5"}
+    url = "https://www.covers.com/sport/football/ncaaf/odds"
+    results = requests.get(url, headers=headers)
+    
+    soup = BeautifulSoup(results.text, "html.parser")
+    openOddsMoneyLine = parseMoneyLineOpenOdds(soup)
+    # print(openOddsMoneyLine)
 
-    soup = BeautifulSoup(url, "html.parser")
-    df = parse_soup(soup)
+def parseMoneyLineOpenOdds(soup):
+    tableOdds = soup.find_all('table')[0] #odds
+    games_odds = tableOdds.find_all('div', '__openOdds')
+    teams_odds = tableOdds.find_all('div', '__teams')
+    
 
-    #add query functions here
+    d = {'Home Team'}
+    openOdds = pd.DataFrame(data=d)
+ 
+    for game_odds, team_odds in zip(games_odds, teams_odds):
+        away = team_odds.find('div', '__away')
+        awayImg = away.find('a')
+        awayTeam = awayImg.find('img')['title']
 
-def getUrl(sport):
-    return("https://www.covers.com/sport/football/ncaaf/odds")
+        home = team_odds.find('div', '__home')
+        homeImg = home.find('a')
+        homeTeam = homeImg.find('img')['title']
 
-def parse_soup(soup):
-    #create dataframe w/ all data
+        awayOdds = game_odds.find('div', '__awayOdds')
+        away_american = awayOdds.find('div', 'American __american').string
+        away_decimal = awayOdds.find('div', 'Decimal __decimal').string
+        away_Fraction = awayOdds.find('div', '__fractional').string
 
-    #div classes needed
-    #tr class="oddsGameRow" 
-        # data-home-conference="American Athletic"
-        # data-away-conference="American Athletic"
-        # data-home-team-rank="-1"
-        # data-away-team-rank="-1"
-        #div class="__startDate"
-            #div class="__date"
-            #div class="__time"
-        #div 
-
-    #where are team names?
-
-    oddsGameRows = soup.find_all("tr class=\"oddsGameRow\"")
-    for oddsGameRow in oddsGameRows:
-        home_conf = oddsGameRow['data-home-conference']
-        home_rank = oddsGameRow['data-home-team-rank']
-        away_conf = oddsGameRow['data-away-conference']
-        away_rank = oddsGameRow['data-away-team-rank']
-
-        descendents = oddsGameRow.descendents
-        date = descendents.find("__date")
-        time = descendents.find("__time")
-
-        #df.addrow(all this stuff)
-
-    #tr class="covers-CoversOdds-mainTR oddsGameRow"
-        # data-home-conference="American Athletic"
-        # data-away-conference="American Athletic"
-        # data-home-team-rank="-1"
-        # data-away-team-rank="-1"
-        #td class=covers-CoversMatchups-centerAlignHelper covers-CoversOdss-oddsTd covers-CoversOdds-odssTdSpecial liveOddsCell __awaiting
-            #data-book="PointsBet"
-            #data-game="266024"
-            #data-type="spread"
-            #data-date="1664921635"
-            #div class="__bookOdds covers-Covers-Odds-withNoBorder"
-                #div class="__awayOdds covers-CoversMatchups-topOddsAway"
-                #div class="__homeOdds  "
-                    #div class="American __american"
+        homeOdds = game_odds.find('div', '__homeOdds')
+        home_american = homeOdds.find('div', 'American __american').string
+        home_decimal = homeOdds.find('div', 'Decimal __decimal').string
+        home_Fraction = homeOdds.find('div', 'Fraction __fractional').string
         
-    pass
+        print(awayTeam + " " + away_american + " " + away_decimal + " " + away_Fraction)
+        print(homeTeam + " " + home_american + " " + home_decimal + " " + home_Fraction)
+          
+        openOdds.loc[len(openOdds.index)] = {homeTeam: {home_american, home_decimal, home_Fraction}, 
+                                            awayTeam: {away_american, away_decimal, away_Fraction}}
+    
+    return(openOdds)
 
 if __name__ == "__main__":
     main()
